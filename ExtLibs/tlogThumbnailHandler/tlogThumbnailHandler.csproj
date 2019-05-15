@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0</TargetFrameworks>
+    <ApplicationIcon />
+    <OutputTypeEx>library</OutputTypeEx>
+    <StartupObject />
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <DebugType>full</DebugType>
+    <DebugSymbols>True</DebugSymbols>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <Authors>Michael Oborne</Authors>
+    <Company>Michael Oborne</Company>
+  </PropertyGroup>
+  <ItemGroup>
+    <Folder Include="Properties\" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Drawing.Common" Version="4.5.0-preview1-25914-04" />
+  </ItemGroup>
+</Project>
