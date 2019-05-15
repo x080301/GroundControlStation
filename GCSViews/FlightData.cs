@@ -4547,6 +4547,11 @@ namespace MissionPlanner.GCSViews
 
             MainV2.comPort.sendPacket(go, MainV2.comPort.MAV.sysid, MainV2.comPort.MAV.compid);
         }
+
+        private void hud1_Load(object sender, EventArgs e)
+        {
+
+        }
     }
 }
  

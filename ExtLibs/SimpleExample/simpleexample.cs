@@ -9,12 +9,15 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
+
+
+
 namespace SimpleExample
 {
     public partial class simpleexample : Form
     {
-        MAVLink.MavlinkParse mavlink = new MAVLink.MavlinkParse();
-        bool armed = false;
+        MAVLink.MavlinkParse mavlink = new MAVLink.MavlinkParse();//MAVLINK解析包函数，通过这个函数从串口得到一帧的数据
+            bool armed = false;
         // locking to prevent multiple reads on serial port
         object readlock = new object();
         // our target sysid
@@ -37,7 +40,7 @@ namespace SimpleExample
             }
 
             // set the comport options
-            serialPort1.PortName = CMB_comport.Text;
+            serialPort1.PortName = CMB_comport.Text; //打开串口
             serialPort1.BaudRate = int.Parse(cmb_baudrate.Text);
 
             // open the comport
