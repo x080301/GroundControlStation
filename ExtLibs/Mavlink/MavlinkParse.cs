@@ -135,7 +135,7 @@ public partial class MAVLink
             return message;
         }
 
-        public byte[] GenerateMAVLinkPacket10(MAVLINK_MSG_ID messageType, object indata)
+        public byte[] GenerateMAVLinkPacket10(MAVLINK_MSG_ID messageType, object indata)//产生信息包
         {
             byte[] data;
 

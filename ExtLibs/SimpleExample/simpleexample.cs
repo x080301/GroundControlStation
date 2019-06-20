@@ -21,14 +21,15 @@ namespace SimpleExample
         // locking to prevent multiple reads on serial port
         object readlock = new object();
         // our target sysid
-        byte sysid;
+        byte sysid=1;
         // our target compid
-        byte compid;
+        byte compid=1;
 
         public simpleexample()
         {
             InitializeComponent();
         }
+        
 
         private void but_connect_Click(object sender, EventArgs e)
         {
@@ -49,11 +50,130 @@ namespace SimpleExample
             // set timeout to 2 seconds
             serialPort1.ReadTimeout = 2000;
 
+            //启动单独的线程
             BackgroundWorker bgw = new BackgroundWorker();
 
+            //开始接收包,并作相应的处理
             bgw.DoWork += bgw_DoWork;
+            //连接质量判断
+            bgw.DoWork += if_lost_connection;
+            //图像识别模块
+            bgw.DoWork += IIModule;
+            //控制模块
+            bgw.DoWork += flight_controler;
 
             bgw.RunWorkerAsync();
+        }
+
+        //图像识别模块
+        static bool II_arrived = false;//是否识别到标记/是否抵达目的地
+        static int x=0;//所识别到标记的中心点，在图中的x坐标
+        static int y=0;//所识别到标记的中心点，在图中的y坐标
+        static bool II_finished = false;
+        void IIModule(object sender, DoWorkEventArgs e)//sender与e为开启单独线程所用
+        {
+            
+        }
+        //处理模块
+        void flight_controler(object sender, DoWorkEventArgs e)
+        {
+            while(serialPort1.IsOpen)
+            {
+                if(!II_finished)
+                {
+                    continue;
+                }
+                II_finished = false;
+
+                //执行相关的命令处理
+                ushort cmd4sender=0;
+
+                //命令发送
+                flight_control_commond_sender(cmd4sender);
+
+            }
+        }
+        //指令发送模块
+        void flight_control_commond_sender(ushort cmd4sender)
+        {
+            MAVLink.mavlink_command_long_t req = new MAVLink.mavlink_command_long_t();
+
+            req.target_system = sysid;
+            req.target_component = compid;
+
+            req.command = cmd4sender;
+
+            req.param1 = 0;
+            /*
+            req.param2 = p2;
+            req.param3 = p3;
+            req.param4 = p4;
+            req.param5 = p5;
+            req.param6 = p6;
+            req.param7 = p7;
+            */
+
+            byte[] packet = mavlink.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.COMMAND_LONG, req);
+
+            serialPort1.Write(packet, 0, packet.Length);
+
+            try
+            {//200ms内，收信息。若收到成功动作的信息，结束收取。若未收到其他类型信息，输出而后继续收。若200ms后依然没收到，那么直接结束。
+                var ack = readsomedata<MAVLink.mavlink_command_ack_t>(sysid, compid);
+                //if (ack.result == (byte)MAVLink.MAV_RESULT.ACCEPTED)
+            }
+            catch
+            {
+            }
+        }
+
+
+
+        //连接质量考量<-心跳包改为10Hz
+        static int Counter4heartbeat = 0;
+        static DateTime Time4heartbeat = DateTime.Now.AddSeconds(1);
+        static int connect_statue = 0;//0连接正常，1差，2失联
+        void if_lost_connection(object sender, DoWorkEventArgs e)
+        {
+            while(serialPort1.IsOpen)
+            {
+                if (DateTime.Now < Time4heartbeat)
+                    continue;
+
+                if (Counter4heartbeat == 0)
+                {
+                    if (connect_statue != 2)
+                    {
+                        connect_statue = 2;
+                        Console.WriteLine("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
+                        Console.WriteLine("失去连接");
+                        Console.WriteLine("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
+                    }
+                }
+                else if (Counter4heartbeat <= 6)
+                {
+                    if (connect_statue != 1)
+                    {
+                        connect_statue = 1;
+                        Console.WriteLine("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
+                        Console.WriteLine("连接质量差");
+                        Console.WriteLine("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
+                    }
+                }
+                else
+                {
+                    if (connect_statue != 0)
+                    {
+                        connect_statue = 0;
+                        Console.WriteLine("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
+                        Console.WriteLine("连接恢复");
+                        Console.WriteLine("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
+                    }
+                }
+
+                Time4heartbeat = DateTime.Now.AddSeconds(1);
+                Counter4heartbeat = 0;
+            }
         }
 
         void bgw_DoWork(object sender, DoWorkEventArgs e)
@@ -73,9 +193,12 @@ namespace SimpleExample
                             continue;
                     }
 
+
+
                     // check to see if its a hb packet from the comport
                     if (packet.data.GetType() == typeof(MAVLink.mavlink_heartbeat_t))
                     {
+                        Counter4heartbeat++;
                         var hb = (MAVLink.mavlink_heartbeat_t)packet.data;
 
                         // save the sysid and compid of the seen MAV
@@ -142,7 +265,7 @@ namespace SimpleExample
             throw new Exception("No packet match found");
         }
 
-        private void but_armdisarm_Click(object sender, EventArgs e)
+        private void armdisarm()
         {
             MAVLink.mavlink_command_long_t req = new MAVLink.mavlink_command_long_t();
 
@@ -167,21 +290,30 @@ namespace SimpleExample
             serialPort1.Write(packet, 0, packet.Length);
 
             try
-            {
+            {//readsomedata<MAVLink.mavlink_command_ack_t>：200ms内，收信息。若收到成功动作的信息，结束收取。若未收到其他类型信息，输出而后继续收。若200ms后依然没收到，那么直接结束。
                 var ack = readsomedata<MAVLink.mavlink_command_ack_t>(sysid, compid);
-                if (ack.result == (byte)MAVLink.MAV_RESULT.ACCEPTED) 
+                if (ack.result == (byte)MAVLink.MAV_RESULT.ACCEPTED)
                 {
 
                 }
             }
-            catch 
-            { 
+            catch
+            {
             }
+        }
+        private void but_armdisarm_Click(object sender, EventArgs e)
+        {
+            armdisarm();
         }
 
         private void CMB_comport_Click(object sender, EventArgs e)
         {
             CMB_comport.DataSource = SerialPort.GetPortNames();
+        }
+
+        private void CMB_comport_SelectedIndexChanged(object sender, EventArgs e)
+        {
+
         }
     }
 }
