@@ -58,12 +58,50 @@ namespace SimpleExample
             //连接质量判断
             bgw.DoWork += if_lost_connection;
             //图像识别模块
-            bgw.DoWork += IIModule;
+            //bgw.DoWork += IIModule;
             //控制模块
-            bgw.DoWork += flight_controler;
+            //bgw.DoWork += flight_controler;
+            //测试信息发送模块
+            bgw.DoWork += TestSend1;
+            bgw.DoWork += TestSend2;
 
             bgw.RunWorkerAsync();
         }
+
+        //测试信息发送模块 
+        static DateTime Time4TestSend = DateTime.Now.AddSeconds(1);
+        void TestSend1(object sender, DoWorkEventArgs e)//sender与e为开启单独线程所用
+        {
+            while (serialPort1.IsOpen)
+            {
+                if (DateTime.Now > Time4TestSend)
+                {
+                    MAVLink.mavlink_command_long_t req1 = new MAVLink.mavlink_command_long_t();
+                    req1.target_system = sysid;
+                    req1.target_component = compid;
+                    req1.command = (ushort)2;
+                    byte[] packet1 = mavlink.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.COMMAND_LONG, req1);
+                    serialPort1.Write(packet1, 0, packet1.Length);
+
+                    Time4TestSend = DateTime.Now.AddSeconds(1);
+                }
+            }
+        }
+        void TestSend2(object sender, DoWorkEventArgs e)//sender与e为开启单独线程所用
+        {
+            while (serialPort1.IsOpen)
+            {
+                if (DateTime.Now > Time4TestSend)
+                {
+                    MAVLink.mavlink_heartbeat_t req2 = new MAVLink.mavlink_heartbeat_t();
+                    byte[] packet2 = mavlink.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.HEARTBEAT, req2);
+                    serialPort1.Write(packet2, 0, packet2.Length);
+
+                    Time4TestSend = DateTime.Now.AddSeconds(1);
+                }
+            }
+        }
+
 
         //图像识别模块
         static bool II_arrived = false;//是否识别到标记/是否抵达目的地
@@ -103,8 +141,8 @@ namespace SimpleExample
 
             req.command = cmd4sender;
 
-            req.param1 = 0;
             /*
+            req.param1 = p1;
             req.param2 = p2;
             req.param3 = p3;
             req.param4 = p4;
@@ -116,7 +154,7 @@ namespace SimpleExample
             byte[] packet = mavlink.GenerateMAVLinkPacket10(MAVLink.MAVLINK_MSG_ID.COMMAND_LONG, req);
 
             serialPort1.Write(packet, 0, packet.Length);
-
+            /*回执包未准备好
             try
             {//200ms内，收信息。若收到成功动作的信息，结束收取。若未收到其他类型信息，输出而后继续收。若200ms后依然没收到，那么直接结束。
                 var ack = readsomedata<MAVLink.mavlink_command_ack_t>(sysid, compid);
@@ -125,6 +163,7 @@ namespace SimpleExample
             catch
             {
             }
+            */
         }
 
 
@@ -215,12 +254,24 @@ namespace SimpleExample
                                 target_component = compid,
                                 target_system = sysid
                             });
+                        Console.WriteLine("心跳包");
                     }
 
                     // from here we should check the the message is addressed to us
                     if (sysid != packet.sysid || compid != packet.compid)
                         continue;
                     
+                    if(packet.msgid==(byte)MAVLink.MAVLINK_MSG_ID.COMMAND_LONG)
+                    {
+                        var att = (MAVLink.mavlink_command_long_t)packet.data;
+                        int cmd = (int)att.command;
+                        if (cmd == 1)
+                            Console.WriteLine("心跳包回执");
+                        else if(cmd==2)
+                            Console.WriteLine("长消息回执");
+                        else
+                            Console.WriteLine("未知错误");
+                    }
                     if (packet.msgid == (byte)MAVLink.MAVLINK_MSG_ID.ATTITUDE)
                     //or
                     //if (packet.data.GetType() == typeof(MAVLink.mavlink_attitude_t))
